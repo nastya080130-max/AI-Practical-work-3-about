@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ToDo App — Observer Pattern</title>
+  <style>
+    /* ============================================
+       RESET & BASE (Mobile-First)
+       ============================================ */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #111827;
+      --bg-card: #1f2937;
+      --bg-input: #374151;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.35);
+      --accent-dim: rgba(16, 185, 129, 0.15);
+      --danger: #ef4444;
+      --danger-glow: rgba(239, 68, 68, 0.3);
+      --priority-low: #3b82f6;
+      --priority-mid: #f59e0b;
+      --priority-high: #ef4444;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --transition: 0.25s ease;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ============================================
+       LAYOUT
+       ============================================ */
+    .app {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    /* ============================================
+       HEADER & COUNTERS
+       ============================================ */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .counters {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .counter-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .counter-badge .num {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.95rem;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    /* ============================================
+       FORM
+       ============================================ */
+    .task-form {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-row-inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border var(--transition), box-shadow var(--transition);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .form-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-group select option {
+      background: var(--bg-input);
+      color: var(--text-primary);
+    }
+
+    .btn-add {
+      width: 100%;
+      margin-top: 4px;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition), box-shadow var(--transition), transform 0.15s;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-add:hover {
+      background: #059669;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .btn-add:active {
+      transform: scale(0.97);
+    }
+
+    /* ============================================
+       FILTERS
+       ============================================ */
+    .filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 20px;
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .filter-btn {
+      flex: 1;
+      padding: 8px 4px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .filter-btn:hover {
+      color: var(--text-secondary);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .filter-btn.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+      box-shadow: 0 0 12px rgba(16,185,129,0.1);
+    }
+
+    /* ============================================
+       TASK LIST
+       ============================================ */
+    .task-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      transition: border var(--transition), opacity var(--transition), transform 0.2s;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .task-item:hover {
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .task-item.completed {
+      opacity: 0.5;
+    }
+
+    .task-item.completed .task-text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+
+    /* Custom Checkbox */
+    .task-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      border: 2px solid var(--text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-top: 2px;
+      position: relative;
+    }
+
+    .task-checkbox:hover {
+      border-color: var(--accent);
+    }
+
+    .task-checkbox:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .task-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .task-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .task-text {
+      font-size: 0.95rem;
+      font-weight: 500;
+      word-break: break-word;
+      transition: color var(--transition);
+    }
+
+    .task-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+      align-items: center;
+    }
+
+    .priority-tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .priority-low {
+      background: rgba(59,130,246,0.15);
+      color: var(--priority-low);
+    }
+
+    .priority-mid {
+      background: rgba(245,158,11,0.15);
+      color: var(--priority-mid);
+    }
+
+    .priority-high {
+      background: rgba(239,68,68,0.15);
+      color: var(--priority-high);
+    }
+
+    .deadline-tag {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .deadline-tag.overdue {
+      color: var(--danger);
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: all var(--transition);
+      margin-top: 2px;
+      line-height: 1;
+    }
+
+    .btn-delete:hover {
+      color: var(--danger);
+      background: var(--danger-glow);
+    }
+
+    /* ============================================
+       EMPTY STATE
+       ============================================ */
+    .empty-state {
+      text-align: center;
+      padding: 48px 16px;
+      color: var(--text-muted);
+    }
+
+    .empty-state .icon {
+      font-size: 2.5rem;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .empty-state p {
+      font-size: 0.9rem;
+    }
+
+    /* ============================================
+       RESPONSIVE (Tablet+)
+       ============================================ */
+    @media (min-width: 480px) {
+      .app {
+        padding: 40px 24px 64px;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .form-row-inline {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app" id="app">
+
+    <!-- ===== HEADER & COUNTERS ===== -->
+    <header class="header">
+      <h1>⚡ ToDo Manager</h1>
+      <p>Патерн Observer · Vanilla JS · localStorage</p>
+      <div class="counters" id="counters">
+        <div class="counter-badge">
+          Всього: <span class="num" id="count-total">0</span>
+        </div>
+        <div class="counter-badge">
+          Виконано: <span class="num" id="count-done">0</span>
+        </div>
+        <div class="counter-badge">
+          Активних: <span class="num" id="count-active">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== ADD TASK FORM ===== -->
+    <form class="task-form" id="task-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="task-text">Завдання</label>
+          <input
+            type="text"
+            id="task-text"
+            placeholder="Що потрібно зробити?"
+            required
+            maxlength="200"
+          />
+        </div>
+        <div class="form-row-inline">
+          <div class="form-group">
+            <label for="task-priority">Пріоритет</label>
+            <select id="task-priority">
+              <option value="low">🟢 Низький</option>
+              <option value="mid" selected>🟡 Середній</option>
+              <option value="high">🔴 Високий</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-deadline">Дедлайн</label>
+            <input type="date" id="task-deadline" />
+          </div>
+        </div>
+        <button type="submit" class="btn-add">＋ Додати завдання</button>
+      </div>
+    </form>
+
+    <!-- ===== FILTERS ===== -->
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-filter="all">Усі</button>
+      <button class="filter-btn" data-filter="active">Активні</button>
+      <button class="filter-btn" data-filter="completed">Виконані</button>
+    </div>
+
+    <!-- ===== TASK LIST ===== -->
+    <ul class="task-list" id="task-list"></ul>
+
+  </div>
+
+  <script>
+    /* ===========================================================
+       ПАТЕРН OBSERVER — РЕАЛІЗАЦІЯ
+       ===========================================================
+       Store (Subject) зберігає стан і сповіщає всіх підписників.
+       Кожен View (Observer) має метод update(state), який
+       викликається автоматично при будь-якій зміні даних.
+       =========================================================== */
+
+    // ─────────────────────────────────────
+    // 1. STORE — Subject (Observable)
+    // ─────────────────────────────────────
+    class Store {
+      constructor() {
+        this._observers = [];
+        this._tasks = this._loadFromStorage();
+        this._filter = 'all'; // 'all' | 'active' | 'completed'
+      }
+
+      /* --- Observer API --- */
+
+      subscribe(observer) {
+        this._observers.push(observer);
+      }
+
+      unsubscribe(observer) {
+        this._observers = this._observers.filter(o => o !== observer);
+      }
+
+      /** Сповіщаємо всіх підписників, передаючи актуальний стан */
+      _notify() {
+        const state = this.getState();
+        this._observers.forEach(observer => observer.update(state));
+      }
+
+      /* --- Дані --- */
+
+      getState() {
+        const filtered = this._getFilteredTasks();
+        const total = this._tasks.length;
+        const done = this._tasks.filter(t => t.isCompleted).length;
+        return {
+          tasks: filtered,
+          filter: this._filter,
+          counters: {
+            total,
+            done,
+            active: total - done,
+          },
+        };
+      }
+
+      _getFilteredTasks() {
+        switch (this._filter) {
+          case 'active':
+            return this._tasks.filter(t => !t.isCompleted);
+          case 'completed':
+            return this._tasks.filter(t => t.isCompleted);
+          default:
+            return [...this._tasks];
+        }
+      }
+
+      /* --- Мутації (кожна викликає _notify) --- */
+
+      addTask(text, priority, deadline) {
+        const task = {
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          text: text.trim(),
+          priority,       // 'low' | 'mid' | 'high'
+          deadline,       // 'YYYY-MM-DD' або ''
+          isCompleted: false,
+          createdAt: Date.now(),
+        };
+        this._tasks.unshift(task);
+        this._saveToStorage();
+        this._notify();
+      }
+
+      toggleTask(id) {
+        const task = this._tasks.find(t => t.id === id);
+        if (task) {
+          task.isCompleted = !task.isCompleted;
+          this._saveToStorage();
+          this._notify();
+        }
+      }
+
+      deleteTask(id) {
+        this._tasks = this._tasks.filter(t => t.id !== id);
+        this._saveToStorage();
+        this._notify();
+      }
+
+      setFilter(filter) {
+        this._filter = filter;
+        this._notify(); // дані не змінились, але відображення — так
+      }
+
+      /* --- localStorage --- */
+
+      _saveToStorage() {
+        try {
+          localStorage.setItem('todo_tasks', JSON.stringify(this._tasks));
+        } catch (e) {
+          console.warn('localStorage недоступний:', e);
+        }
+      }
+
+      _loadFromStorage() {
+        try {
+          const raw = localStorage.getItem('todo_tasks');
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
+      }
+    }
+
+    // ─────────────────────────────────────
+    // 2. VIEWS — Observers
+    // ─────────────────────────────────────
+
+    /**
+     * TaskListView — рендерить список завдань у DOM.
+     * Реагує на зміни стану через update(state).
+     */
+    class TaskListView {
+      constructor(containerEl, store) {
+        this._container = containerEl;
+        this._store = store;
+      }
+
+      update(state) {
+        const { tasks } = state;
+
+        if (tasks.length === 0) {
+          this._container.innerHTML = `
+            <li class="empty-state">
+              <div class="icon">📋</div>
+              <p>Завдань поки немає. Додайте перше!</p>
+            </li>`;
+          return;
+        }
+
+        this._container.innerHTML = tasks.map(task => this._renderTask(task)).join('');
+        this._attachListeners();
+      }
+
+      _renderTask(task) {
+        const completedClass = task.isCompleted ? 'completed' : '';
+        const checkedAttr = task.isCompleted ? 'checked' : '';
+
+        const priorityLabels = { low: 'Низький', mid: 'Середній', high: 'Високий' };
+        const priorityClass = `priority-${task.priority}`;
+
+        let deadlineHTML = '';
+        if (task.deadline) {
+          const isOverdue = !task.isCompleted && new Date(task.deadline) < new Date(new Date().toDateString());
+          const overdueClass = isOverdue ? 'overdue' : '';
+          const formatted = this._formatDate(task.deadline);
+          deadlineHTML = `<span class="deadline-tag ${overdueClass}">📅 ${formatted}${isOverdue ? ' (прострочено)' : ''}</span>`;
+        }
+
+        return `
+          <li class="task-item ${completedClass}" data-id="${task.id}">
+            <input
+              type="checkbox"
+              class="task-checkbox"
+              ${checkedAttr}
+              data-action="toggle"
+              aria-label="Відмітити виконаним"
+            />
+            <div class="task-body">
+              <div class="task-text">${this._escapeHTML(task.text)}</div>
+              <div class="task-meta">
+                <span class="priority-tag ${priorityClass}">${priorityLabels[task.priority]}</span>
+                ${deadlineHTML}
+              </div>
+            </div>
+            <button
+              class="btn-delete"
+              data-action="delete"
+              aria-label="Видалити завдання"
+              title="Видалити"
+            >✕</button>
+          </li>`;
+      }
+
+      _attachListeners() {
+        this._container.querySelectorAll('[data-action="toggle"]').forEach(cb => {
+          cb.addEventListener('change', (e) => {
+            const id = e.target.closest('.task-item').dataset.id;
+            this._store.toggleTask(id);
+          });
+        });
+
+        this._container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.target.closest('.task-item').dataset.id;
+            this._store.deleteTask(id);
+          });
+        });
+      }
+
+      _formatDate(dateStr) {
+        const [y, m, d] = dateStr.split('-');
+        return `${d}.${m}.${y}`;
+      }
+
+      _escapeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+    }
+
+    /**
+     * CounterView — оновлює лічильники у шапці.
+     */
+    class CounterView {
+      constructor(totalEl, doneEl, activeEl) {
+        this._totalEl = totalEl;
+        this._doneEl = doneEl;
+        this._activeEl = activeEl;
+      }
+
+      update(state) {
+        const { total, done, active } = state.counters;
+        this._totalEl.textContent = total;
+        this._doneEl.textContent = done;
+        this._activeEl.textContent = active;
+      }
+    }
+
+    /**
+     * FilterView — керує кнопками фільтрів.
+     * Одночасно є і Observer (підсвічує активну кнопку),
+     * і джерелом подій (передає фільтр у Store).
+     */
+    class FilterView {
+      constructor(containerEl, store) {
+        this._container = containerEl;
+        this._store = store;
+        this._buttons = containerEl.querySelectorAll('.filter-btn');
+        this._attachListeners();
+      }
+
+      update(state) {
+        this._buttons.forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.filter === state.filter);
+        });
+      }
+
+      _attachListeners() {
+        this._buttons.forEach(btn => {
+          btn.addEventListener('click', () => {
+            this._store.setFilter(btn.dataset.filter);
+          });
+        });
+      }
+    }
+
+    // ─────────────────────────────────────
+    // 3. APP — Controller / Entry Point
+    // ─────────────────────────────────────
+    class App {
+      constructor() {
+        // 1) Створюємо Store (Subject)
+        this.store = new Store();
+
+        // 2) Створюємо Views (Observers)
+        this.taskListView = new TaskListView(
+          document.getElementById('task-list'),
+          this.store
+        );
+
+        this.counterView = new CounterView(
+          document.getElementById('count-total'),
+          document.getElementById('count-done'),
+          document.getElementById('count-active')
+        );
+
+        this.filterView = new FilterView(
+          document.getElementById('filters'),
+          this.store
+        );
+
+        // 3) Підписуємо Observers на Subject
+        this.store.subscribe(this.taskListView);
+        this.store.subscribe(this.counterView);
+        this.store.subscribe(this.filterView);
+
+        // 4) Прив'язуємо форму
+        this._bindForm();
+
+        // 5) Перший рендер (сповіщаємо всіх підписників поточним станом)
+        this.store._notify();
+      }
+
+      _bindForm() {
+        const form = document.getElementById('task-form');
+        const textInput = document.getElementById('task-text');
+        const prioritySelect = document.getElementById('task-priority');
+        const deadlineInput = document.getElementById('task-deadline');
+
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+
+          const text = textInput.value;
+          if (!text.trim()) return;
+
+          this.store.addTask(
+            text,
+            prioritySelect.value,
+            deadlineInput.value
+          );
+
+          // Очищаємо форму
+          textInput.value = '';
+          deadlineInput.value = '';
+          prioritySelect.value = 'mid';
+          textInput.focus();
+        });
+      }
+    }
+
+    // ─────────────────────────────────────
+    // ЗАПУСК
+    // ─────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      new App();
+    });
+  </script>
+
+</body>
+</html>
